@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
 cask 'athas' do
-  version '0.1.2'
+  version '0.3.1'
 
   # Intel Macs (x64/amd64)
   if Hardware::CPU.intel?
     url "https://github.com/athasdev/athas/releases/download/v#{version}/Athas_#{version}_x64.dmg"
-    sha256 'e82d38abaa4925b8171951428008e6f770e157f64bb9a21f3faa1d8a358dfc58'
+    sha256 'efc78e0c9b93a09c43e52a5537e2ac373d0e840a6386330afb48b4cf8561d2e2'
   # Apple Silicon Macs (M1, M2, M3, M4 - arm64/aarch64)
   else
     url "https://github.com/athasdev/athas/releases/download/v#{version}/Athas_#{version}_aarch64.dmg"
-    sha256 'df49108f61f7bc5ca0d2ec0fa3cacb8ac5915983a00c226636f17d2891b995bb'
+    sha256 '71f2bdb4e29e04ba7627cc07bb71c1ea543998b02291c6168954131e95c16250'
   end
 
   name 'Athas'
