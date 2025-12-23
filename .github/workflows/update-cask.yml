@@ -1,0 +1,83 @@
+name: Update Cask on New Release
+
+on:
+  repository_dispatch:
+    types: [new-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number"
+        required: true
+        type: string
+
+jobs:
+  update-cask:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ github.event.client_payload.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Updating to version: $VERSION"
+
+      - name: Download x64 DMG and calculate SHA256
+        id: x64
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://github.com/athasdev/athas/releases/download/v${VERSION}/Athas_${VERSION}_x64.dmg"
+          echo "Downloading from: $URL"
+          curl -L -o athas_x64.dmg "$URL"
+          SHA256=$(shasum -a 256 athas_x64.dmg | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "x64 SHA256: $SHA256"
+          rm athas_x64.dmg
+
+      - name: Download aarch64 DMG and calculate SHA256
+        id: aarch64
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://github.com/athasdev/athas/releases/download/v${VERSION}/Athas_${VERSION}_aarch64.dmg"
+          echo "Downloading from: $URL"
+          curl -L -o athas_aarch64.dmg "$URL"
+          SHA256=$(shasum -a 256 athas_aarch64.dmg | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "aarch64 SHA256: $SHA256"
+          rm athas_aarch64.dmg
+
+      - name: Update cask file
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          X64_SHA="${{ steps.x64.outputs.sha256 }}"
+          AARCH64_SHA="${{ steps.aarch64.outputs.sha256 }}"
+
+          # Update version
+          sed -i '' "s/version '[0-9.]*'/version '${VERSION}'/" Casks/athas.rb
+
+          # Update first sha256 (x64)
+          awk -v new="$X64_SHA" '{if (/sha256/ && !done) {sub(/sha256 '\''[a-f0-9]*'\''/, "sha256 '\''" new "'\''"); done=1} print}' Casks/athas.rb > temp && mv temp Casks/athas.rb
+
+          # Update second sha256 (aarch64)
+          awk -v new="$AARCH64_SHA" '{count+=(/sha256/); if (/sha256/ && count==2) {sub(/sha256 '\''[a-f0-9]*'\''/, "sha256 '\''" new "'\''")} print}' Casks/athas.rb > temp && mv temp Casks/athas.rb
+
+          echo "Updated Casks/athas.rb to version ${VERSION}"
+          cat Casks/athas.rb
+
+      - name: Commit and push changes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/athas.rb
+          git commit -m "Update Homebrew cask to v${VERSION}"
+          git push
